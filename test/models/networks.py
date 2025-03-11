@@ -116,7 +116,11 @@ class ResUnetSkipConnectionBlock(nn.Module):
             x = self.model(x)
             attention_map = self.attention(skip_x)  # Apply spatial attention
             x = torch.cat([x, skip_x * attention_map], dim=1)  # Multiply attention map with skip connection
+              print(f"Input shape before conv: {x.shape}")  # Debugging
+            x = self.model(x)
+              print(f"Output shape after conv: {x.shape}")  # Debugging
             return x
+
 
 
 class Vgg19(nn.Module):
