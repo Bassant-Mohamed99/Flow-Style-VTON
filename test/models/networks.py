@@ -112,7 +112,7 @@ class ResUnetSkipConnectionBlock(nn.Module):
         if self.outermost:
              print(f"Input shape before conv: {x.shape}")  # Debugging
              print(f"Output shape after conv: {x.shape}")  # Debugging
-            return self.model(x)
+             return self.model(x)
         else:
             skip_x = x
             x = self.model(x)
