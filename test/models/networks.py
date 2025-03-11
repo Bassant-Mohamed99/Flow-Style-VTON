@@ -109,9 +109,9 @@ class ResUnetSkipConnectionBlock(nn.Module):
         self.model = nn.Sequential(*model)
 
     def forward(self, x):
-         print(f"Input shape before conv: {x.shape}")  # Debugging
-         print(f"Output shape after conv: {x.shape}")  # Debugging
         if self.outermost:
+             print(f"Input shape before conv: {x.shape}")  # Debugging
+             print(f"Output shape after conv: {x.shape}")  # Debugging
             return self.model(x)
         else:
             skip_x = x
