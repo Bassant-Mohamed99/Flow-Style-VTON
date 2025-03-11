@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.parallel
+import torch.nn.functional as F
 #from torchvision import models
 #from options.train_options import TrainOptions
 import os
@@ -57,56 +58,53 @@ class ResUnetGenerator(nn.Module):
 # Defines the submodule with skip connection.
 # X -------------------identity---------------------- X
 #   |-- downsampling -- |submodule| -- upsampling --|
+class SpatialAttention(nn.Module):
+    def __init__(self, kernel_size=7):
+        super(SpatialAttention, self).__init__()
+        self.conv = nn.Conv2d(2, 1, kernel_size, padding=(kernel_size - 1) // 2, bias=False)
+
+    def forward(self, x):
+        avg_out = torch.mean(x, dim=1, keepdim=True)
+        max_out, _ = torch.max(x, dim=1, keepdim=True)
+        x = torch.cat([avg_out, max_out], dim=1)
+        x = self.conv(x)
+        return torch.sigmoid(x)
+
 class ResUnetSkipConnectionBlock(nn.Module):
     def __init__(self, outer_nc, inner_nc, input_nc=None,
-                 submodule=None, outermost=False, innermost=False, norm_layer=nn.BatchNorm2d, use_dropout=False):
+                 submodule=None, outermost=False, innermost=False, norm_layer=nn.InstanceNorm2d):
         super(ResUnetSkipConnectionBlock, self).__init__()
         self.outermost = outermost
         use_bias = norm_layer == nn.InstanceNorm2d
 
         if input_nc is None:
             input_nc = outer_nc
-        downconv = nn.Conv2d(input_nc, inner_nc, kernel_size=3,
-                             stride=2, padding=1, bias=use_bias)
-        # add two resblock
-        res_downconv = [ResidualBlock(inner_nc, norm_layer), ResidualBlock(inner_nc, norm_layer)]
-        res_upconv = [ResidualBlock(outer_nc, norm_layer), ResidualBlock(outer_nc, norm_layer)]
 
-        downrelu = nn.ReLU(True)
-        uprelu = nn.ReLU(True)
-        if norm_layer != None:
+        downconv = nn.Conv2d(input_nc, inner_nc, kernel_size=3, stride=2, padding=1, bias=use_bias)
+        upsample = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
+        upconv = nn.Conv2d(inner_nc * 2, outer_nc, kernel_size=3, stride=1, padding=1, bias=use_bias)
+
+        downrelu = nn.ReLU(inplace=True)
+        uprelu = nn.ReLU(inplace=True)
+
+        if norm_layer is not None:
             downnorm = norm_layer(inner_nc)
             upnorm = norm_layer(outer_nc)
 
+        self.attention = SpatialAttention()  # Add Spatial Attention
+
         if outermost:
-            upsample = nn.Upsample(scale_factor=2, mode='nearest')
-            upconv = nn.Conv2d(inner_nc * 2, outer_nc, kernel_size=3, stride=1, padding=1, bias=use_bias)
-            down = [downconv, downrelu] + res_downconv
+            down = [downconv, downrelu]
             up = [upsample, upconv]
             model = down + [submodule] + up
         elif innermost:
-            upsample = nn.Upsample(scale_factor=2, mode='nearest')
-            upconv = nn.Conv2d(inner_nc, outer_nc, kernel_size=3, stride=1, padding=1, bias=use_bias)
-            down = [downconv, downrelu] + res_downconv
-            if norm_layer == None:
-                up = [upsample, upconv, uprelu] + res_upconv
-            else:
-                up = [upsample, upconv, upnorm, uprelu] + res_upconv
+            down = [downconv, downrelu]
+            up = [upsample, upconv, upnorm, uprelu]
             model = down + up
         else:
-            upsample = nn.Upsample(scale_factor=2, mode='nearest')
-            upconv = nn.Conv2d(inner_nc*2, outer_nc, kernel_size=3, stride=1, padding=1, bias=use_bias)
-            if norm_layer == None:
-                down = [downconv, downrelu] + res_downconv
-                up = [upsample, upconv, uprelu] + res_upconv
-            else:
-                down = [downconv, downnorm, downrelu] + res_downconv
-                up = [upsample, upconv, upnorm, uprelu] + res_upconv
-
-            if use_dropout:
-                model = down + [submodule] + up + [nn.Dropout(0.5)]
-            else:
-                model = down + [submodule] + up
+            down = [downconv, downnorm, downrelu]
+            up = [upsample, upconv, upnorm, uprelu]
+            model = down + [submodule] + up
 
         self.model = nn.Sequential(*model)
 
@@ -114,7 +112,11 @@ class ResUnetSkipConnectionBlock(nn.Module):
         if self.outermost:
             return self.model(x)
         else:
-            return torch.cat([x, self.model(x)], 1)
+            skip_x = x
+            x = self.model(x)
+            attention_map = self.attention(skip_x)  # Apply spatial attention
+            x = torch.cat([x, skip_x * attention_map], dim=1)  # Multiply attention map with skip connection
+            return x
 
 
 class Vgg19(nn.Module):
