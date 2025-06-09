@@ -54,7 +54,7 @@ def tta_forward(generator, warped_cloth, edge, real_image):
     return torch.mean(torch.stack(outputs + [out_flip]), dim=0)
 
 def edge_aware_filter(tensor_img):
-    img = tensor_img.squeeze(0).permute(1, 2, 0).cpu().numpy()
+    img = tensor_img.squeeze(0).permute(1, 2, 0).detach().cpu().numpy()
     img = np.clip(img * 255, 0, 255).astype(np.uint8)
     filtered = cv2.edgePreservingFilter(img, flags=1, sigma_s=60, sigma_r=0.4)
     filtered = filtered.astype(np.float32) / 255.0
