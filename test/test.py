@@ -3,6 +3,7 @@ from options.test_options import TestOptions
 from data.data_loader_test import CreateDataLoader
 from models.networks import ResUnetGenerator, load_checkpoint
 from models.afwm import AFWM
+from skimage.exposure import match_histograms
 import torch.nn as nn
 import os
 import numpy as np
@@ -37,6 +38,15 @@ def de_offset(s_grid):
     offset = torch.cat((offset_y,offset_x),0)
     
     return  offset
+def match_color(src_tensor, ref_tensor):
+    # Inputs: Bx3xHxW tensors
+    src = src_tensor[0].permute(1, 2, 0).detach().cpu().numpy()
+    ref = ref_tensor[0].permute(1, 2, 0).detach().cpu().numpy()
+    
+    matched = match_histograms(src, ref, channel_axis=-1)
+    matched = torch.from_numpy(matched).permute(2, 0, 1).unsqueeze(0).float().to(src_tensor.device)
+    return matched
+
 def tta_forward(generator, warped_cloth, edge, real_image):
     outputs = []
 
@@ -108,6 +118,8 @@ for epoch in range(1,2):
 
         flow_out = warp_model(real_image.cuda(), clothes.cuda())
         warped_cloth, last_flow, = flow_out
+        # ✅ Color correction step (histogram matching)
+        warped_cloth = match_color(warped_cloth, clothes.cuda())
         warped_edge = F.grid_sample(edge.cuda(), last_flow.permute(0, 2, 3, 1),
                           mode='bilinear', padding_mode='zeros')
 
