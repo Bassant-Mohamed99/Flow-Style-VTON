@@ -1,0 +1,16 @@
+import os
+from torchvision.io import read_image
+from pytorch_msssim import ssim
+
+folder_gen = 'our_t_results'
+folder_gt = 'ground_truth'
+
+scores = []
+for fname in os.listdir(folder_gt):
+    if fname in os.listdir(folder_gen):
+        gt = read_image(os.path.join(folder_gt, fname)).float() / 255.
+        gen = read_image(os.path.join(folder_gen, fname)).float() / 255.
+        score = ssim(gen.unsqueeze(0), gt.unsqueeze(0), data_range=1.0)
+        scores.append(score.item())
+
+print(f"Average SSIM: {sum(scores)/len(scores):.4f}")
