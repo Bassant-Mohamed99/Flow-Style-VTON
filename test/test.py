@@ -38,6 +38,14 @@ def de_offset(s_grid):
     offset = torch.cat((offset_y,offset_x),0)
     
     return  offset
+    
+def adjust_gamma(tensor_img, gamma=1.2):
+    img = tensor_img.squeeze(0).permute(1, 2, 0).detach().cpu().numpy()
+    img = np.clip(img, 0, 1)
+    corrected = np.power(img, gamma)
+    corrected = torch.from_numpy(corrected).permute(2, 0, 1).unsqueeze(0).to(tensor_img.device)
+    return corrected
+
 def match_color(src_tensor, ref_tensor):
     # Inputs: Bx3xHxW tensors
     src = src_tensor[0].permute(1, 2, 0).detach().cpu().numpy()
