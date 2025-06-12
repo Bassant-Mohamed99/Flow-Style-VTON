@@ -1,0 +1,23 @@
+from torchmetrics.image.fid import FrechetInceptionDistance
+from torchvision.io import read_image
+from torchvision.transforms import Resize, Normalize, Compose
+import os
+import torch
+
+resize = Resize((299, 299))
+normalize = Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+transform = Compose([resize, normalize])
+
+fid = FrechetInceptionDistance(feature=2048).cuda()
+
+gt_dir = 'ground_truth'
+gen_dir = 'our_t_results'
+
+for fname in os.listdir(gt_dir):
+    gt_img = read_image(os.path.join(gt_dir, fname)).float() / 255.
+    gen_img = read_image(os.path.join(gen_dir, fname)).float() / 255.
+    fid.update(transform(gt_img).unsqueeze(0).cuda(), real=True)
+    fid.update(transform(gen_img).unsqueeze(0).cuda(), real=False)
+
+print("FID:", fid.compute().item())
+
