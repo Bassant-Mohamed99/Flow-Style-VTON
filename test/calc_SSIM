@@ -2,8 +2,8 @@ import os
 from torchvision.io import read_image
 from pytorch_msssim import ssim
 
-folder_gen = 'our_t_results'
-folder_gt = 'ground_truth'
+folder_gen = '/content/Flow-Style-VTON/our_t_results'
+folder_gt = '/content/Flow-Style-VTON/test/p_gt'
 
 scores = []
 for fname in os.listdir(folder_gt):
