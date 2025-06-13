@@ -10,8 +10,8 @@ transform = Compose([resize, normalize])
 
 fid = FrechetInceptionDistance(feature=2048).cuda()
 
-gt_dir = 'ground_truth'
-gen_dir = 'our_t_results'
+gt_dir = '/content/Flow-Style-VTON/test/p_gt'
+gen_dir = '/content/Flow-Style-VTON/our_t_results'
 
 for fname in os.listdir(gt_dir):
     gt_img = read_image(os.path.join(gt_dir, fname)).float() / 255.
